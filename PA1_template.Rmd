@@ -1,25 +1,160 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research Course Project 1"
+author: "acaf"
+date: "3/23/2022"
+output: html_document
 ---
 
+# Assignment Instruction
 
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
+This assignment will be described in multiple parts. You will need to write a report that answers the questions detailed below. Ultimately, you will need to complete the entire assignment in a single R markdown document that can be processed by knitr and be transformed into an HTML file.
 
 
+# About the Data
 
-## What is the average daily activity pattern?
+The data for this assignment can be downloaded from the course web site:
+
+Dataset: Activity monitoring data [52K] (https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+
+The variables included in this dataset are:
+
+steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+
+date: The date on which the measurement was taken in YYYY-MM-DD format
+
+interval: Identifier for the 5-minute interval in which measurement was taken
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
 
 
+## Task 1.1: Loading the data
+First, I'll be needing to download, unzip and save the dataset in my working directory.
+```{r echo = TRUE} 
+filename <- "Activity_monitoring_data.zip"
 
-## Imputing missing values
+if (!file.exists(filename)) {
+  download_url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+  download.file(download_url, destfile = filename)
+  unzip (zipfile = filename)
+}
+
+if (!exists("activity.csv")) {
+    unzip("Activity_monitoring_data.zip") 
+}
+
+datafile <- read.csv("activity.csv", header = TRUE)
+```
+
+## Task 1.2: Preprocessing the data
+After the dataset has been downloaded, I shall perform simple exploratory to be familiar with the data.
+```{r echo = TRUE}
+str(datafile)
+head(datafile)
+tail(datafile)
+
+datafile_2 <- na.omit(datafile)
+```
+
+# Before diving in my analysis on the data, I will load first the necessary packages I'll be needing for this project.
+```{r echo = TRUE}
+library(tidyverse)
+library(knitr)
+library(Hmisc)
+```
 
 
+## Task 2: What is mean total number of steps taken per day?
+To find this, we need to calculate the total steps per day and display it in bar chart.
+```{r echo = TRUE}
+data_steps <- aggregate(steps ~ date, datafile_2, FUN = "sum")
+hist(data_steps$steps, col = "blue", xlab = "Steps per day", ylab = "Frequncy", main = "Total Steps Taken Each Day")
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+Then we calculate and report the mean and median of the total number of steps taken per day:
+```{r echo = TRUE}
+# Calculate the mean
+steps_mean <- mean(data_steps[,2])
+steps_mean
+```
+
+```{r echo = TRUE}
+#Calculate the median
+steps_median <- median(data_steps[,2])
+steps_median
+```
+
+## Task 3: What is the average daily activity pattern?
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis).
+```{r echo = TRUE}
+data_avg <- aggregate(datafile_2$steps, by = list(Interval = datafile_2$interval), FUN = "mean")
+```
+
+```{r echo = TRUE}
+plot(data_avg$Interval, data_avg$x, type = "l", main = "Plot of the 5-Minute Interval", ylab = "Steps Taken (Average)", xlab = "Interval")
+```
+
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r echo = TRUE}
+fivemin <- which.max(data_avg$x)
+fivemin_max <- data_avg[fivemin,1]
+fivemin_max
+```
+
+
+## Task 4: Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+1. Calculate the total number of NA.
+```{r echo = TRUE}
+count_na <- length(which(is.na(datafile$steps)))
+count_na
+```
+
+2. Devise a strategy for filling in all of the missing values in the dataset.
+```{r echo = TRUE}
+fill_value <- datafile
+fill_value$steps <- impute(datafile$steps, fun=mean)
+```
+
+The strategy does not need to be sophisticated.
+```{r echo = TRUE}
+removed_na <- aggregate(fill_value$steps, by = list(Steps.Date = fill_value$date), FUN = "sum")
+hist(removed_na$x, col = "brown", breaks = 20, main = "Total steps taken each day (filled missing values)", xlab = "Steps per day")
+```
+
+
+Calculate and report the mean and median total number of steps taken per day. 
+```{r echo = TRUE}
+removed_na_mean <- mean(removed_na[,2])
+removed_na_mean
+```
+
+```{r echo = TRUE}
+removed_na_median <- median(removed_na[,2])
+removed_na_median
+```
+
+## Task 5: Are there differences in activity patterns between weekdays and weekends?
+For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r echo = TRUE}
+fill_value$date <- as.Date(fill_value$date)
+fill_value$weekday <- weekdays(fill_value$date)
+fill_value$day_type <- factor(fill_value$day_type)
+```
+
+2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r echo = TRUE}
+final_data <- aggregate(steps ~ interval + day_type, data=fill_value, mean)
+
+library(ggplot2)
+ggplot(final_data, aes(interval, steps)) + 
+        geom_line() + 
+        facet_grid(day_type ~ .) +
+        xlab("Intervals") + 
+        ylab("Steps Taken (Average") +
+        ggtitle("Activity Pattern")
+```
